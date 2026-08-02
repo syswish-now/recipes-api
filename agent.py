@@ -38,6 +38,9 @@ repository = os.getenv("REPOSITORY")
 pr_number = os.getenv("PR_NUMBER")
 
 
+print(f"DEBUG: Target Repo = '{repository}', Target PR = '{pr_number}'")
+
+
 
 def parse_repo_url(url: str) -> tuple[str, str]:
     """Parses owner and repository name from a GitHub URL."""
