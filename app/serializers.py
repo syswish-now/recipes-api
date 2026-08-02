@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Recipe, RecipeRating
 
-# This is the change that was made dfdfgfsdgdgfd its very import comment
+# This is the change that was made and its very import comment
 class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
