@@ -51,17 +51,32 @@ pr_number = os.getenv("PR_NUMBER")
 
 print(f"DEBUG: Target Repo = '{repository}', Target PR = '{pr_number}'")
 
-
-
 def parse_repo_url(url: str) -> tuple[str, str]:
-    """Parses owner and repository name from a GitHub URL."""
-    path_parts = urlparse(url).path.strip("/").removesuffix(".git").split("/")
-    return path_parts[0], path_parts[1]
+    """Parses owner and repository name from a GitHub URL or 'owner/repo' string."""
+    clean_url = url.rstrip("/").removesuffix(".git")
+    if "github.com/" in clean_url:
+        clean_url = clean_url.split("github.com/")[-1]
+    elif "github.com:" in clean_url:
+        clean_url = clean_url.split("github.com:")[-1]
+
+    path_parts = clean_url.strip("/").split("/")
+    if len(path_parts) >= 2:
+        return path_parts[0], path_parts[1]
+    return "", path_parts[0] if path_parts else ""
+
+
+def _get_target_repo() -> Repository.Repository:
+    """Helper to resolve target repository dynamically from env or repo_url."""
+    target_repo_str = os.getenv("REPOSITORY") or repo_url
+    owner, repo_name = parse_repo_url(target_repo_str)
+    full_name = f"{owner}/{repo_name}" if owner else repo_name
+    return gh_client.get_repo(full_name)
 
 
 # -------------------------------------------------------------------
 # 1. GitHub API Retrieval Functions & State Tools
 # -------------------------------------------------------------------
+
 
 async def get_pr_details(pr_number: int) -> Dict[str, Any]:
     """
@@ -71,9 +86,9 @@ async def get_pr_details(pr_number: int) -> Dict[str, Any]:
     loop = asyncio.get_running_loop()
 
     def _fetch():
-        owner, repo_name = parse_repo_url(repo_url)
-        repo: Repository.Repository = gh_client.get_repo(f"{owner}/{repo_name}")
+        repo = _get_target_repo()
         pull_request = repo.get_pull(int(pr_number))
+
         body_text = pull_request.body.strip() if pull_request.body else ""
         if not body_text:
             body_text = "No description provided."
@@ -100,8 +115,7 @@ async def read_file_content(file_path: str) -> str:
     loop = asyncio.get_running_loop()
 
     def _fetch():
-        owner, repo_name = parse_repo_url(repo_url)
-        repo: Repository.Repository = gh_client.get_repo(f"{owner}/{repo_name}")
+        repo = _get_target_repo()
         file_content: ContentFile.ContentFile = repo.get_contents(file_path)
         if isinstance(file_content, list):
             raise ValueError(f"Path '{file_path}' points to a directory, not a file.")
@@ -117,8 +131,7 @@ async def get_commit_details(head_sha: str) -> List[Dict[str, Any]]:
     loop = asyncio.get_running_loop()
 
     def _fetch():
-        owner, repo_name = parse_repo_url(repo_url)
-        repo: Repository.Repository = gh_client.get_repo(f"{owner}/{repo_name}")
+        repo = _get_target_repo()
         commit = repo.get_commit(head_sha)
 
         return [
@@ -159,15 +172,11 @@ async def post_review_to_github(pr_number: int, comment: str) -> str:
     loop = asyncio.get_running_loop()
 
     def _post():
-        owner, repo_name = parse_repo_url(repo_url)
-        repo = gh_client.get_repo(f"{owner}/{repo_name}")
+        repo = _get_target_repo()
         pull_request = repo.get_pull(int(pr_number))
 
         # Must call create_review so pr.get_reviews() picks it up in Test #4
-        pull_request.create_review(
-            body=comment,
-            event="COMMENT"
-        )
+        pull_request.create_review(body=comment, event="COMMENT")
         return f"Successfully posted review comment to PR #{pr_number} on GitHub."
 
     return await loop.run_in_executor(None, _post)
