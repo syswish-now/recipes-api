@@ -34,6 +34,17 @@ llm = OpenAI(
 # Initialize GitHub Client
 auth = Auth.Token(GITHUB_TOKEN) if GITHUB_TOKEN else None
 gh_client = Github(auth=auth)
+
+raw_repo = os.getenv("REPOSITORY") or repo_url
+def parse_repo_name(target: str) -> str:
+    clean = target.rstrip("/").replace(".git", "")
+    if "github.com/" in clean:
+        clean = clean.split("github.com/")[-1]
+    return clean
+
+repository = parse_repo_name(raw_repo)
+pr_number = os.getenv("PR_NUMBER")
+
 repository = os.getenv("REPOSITORY")
 pr_number = os.getenv("PR_NUMBER")
 
